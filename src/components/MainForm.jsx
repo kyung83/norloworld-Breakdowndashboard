@@ -15,7 +15,7 @@ const readFileAsBase64 = (file) => {
   });
 }
 
-const endPoint = 'https://script.google.com/macros/s/AKfycbwTHoBwo4RKtAo1Gz3ad0e8ydwUI4TBACO1Wcqnu9FYu_SFHRTVeXJuPHSeRx9o6W_T/exec'
+const endPoint = 'https://script.google.com/macros/s/AKfycbzbI77LjyY_XlFjR-8Zll-gpJ9IAwCY4ukkBeSUh74SOee_fG5yOLM5IpsnfHZob8W7/exec'
 
 export default function MainForm() {
   const [selectedDriver, setSelectedDriver] = useState({})
