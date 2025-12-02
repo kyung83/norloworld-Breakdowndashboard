@@ -11,7 +11,7 @@ import { useFilteredData } from "./BreakdownsContext";
 dayjs.extend(isBetween);
 
 const endPoint =
-  "https://script.google.com/macros/s/AKfycbzbI77LjyY_XlFjR-8Zll-gpJ9IAwCY4ukkBeSUh74SOee_fG5yOLM5IpsnfHZob8W7/exec";
+  "https://script.google.com/macros/s/AKfycbzX6QjhoOsurYDexFE99aCOl1NPJ-MTmjw2U8i7mhNuMaLlJUH7I6Gda0dAOAORnCbB/exec";
 
 export default function FilteredTable() {
   const [{ data: dataTypes, loading: typeLoading, error: TypeError }] =
