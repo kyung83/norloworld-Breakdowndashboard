@@ -40,7 +40,7 @@ function MainContent() {
   const location = useLocation();
   return (
     <div className="flex flex-col flex-1">
-      <Disclosure as="nav" className="border-b border-gray-200 bg-white">
+<Disclosure as="nav" className="border-b border-gray-700 bg-gray-900">
         {({ open }) => (
           <>
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -212,10 +212,10 @@ function MainContent() {
         )}
       </Disclosure>
 
-      <div className="py-4 flex flex-col flex-1">
+<div className="py-4 flex flex-col flex-1 bg-gray-900">
         <header className="mb-4">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <h1 className="text-3xl font-bold leading-tight tracking-tight text-gray-900">
+<h1 className="text-3xl font-bold leading-tight tracking-tight text-gray-100">
               Breakdowns
             </h1>
           </div>
