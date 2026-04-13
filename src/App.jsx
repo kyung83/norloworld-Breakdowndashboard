@@ -221,7 +221,7 @@ function MainContent() {
           </div>
         </header>
         <main className="flex flex-col flex-1">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col flex-1 w-full">
+<div className="flex flex-col flex-1 w-full">
             <Routes>
               <Route
                 path="norloworld-Breakdowndashboard/"
