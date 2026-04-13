@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { FilteredTable, MainForm, Providers } from "./components";
+import { KanbanBoard, MainForm, Providers } from "./components";
 import { Disclosure, Menu, Transition } from "@headlessui/react";
 import { Bars3Icon, BellIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import {
@@ -226,7 +226,7 @@ function MainContent() {
               <Route
                 path="norloworld-Breakdowndashboard/"
                 exact
-                element={<FilteredTable />}
+                element={<KanbanBoard />}
               />
               <Route
                 path="norloworld-Breakdowndashboard/providers"
