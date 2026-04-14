@@ -34,6 +34,28 @@ const STAGES = [
 
 const HIDDEN_STATUSES = ["complete", "n/a", "test"];
 
+// Normalize full state names to abbreviations — dashboard side only
+// Voice agent submits "Michigan", sheet/dropdown expects "MI"
+const STATE_MAP = {
+  "alabama":"AL","alaska":"AK","arizona":"AZ","arkansas":"AR","california":"CA",
+  "colorado":"CO","connecticut":"CT","delaware":"DE","florida":"FL","georgia":"GA",
+  "hawaii":"HI","idaho":"ID","illinois":"IL","indiana":"IN","iowa":"IA",
+  "kansas":"KS","kentucky":"KY","louisiana":"LA","maine":"ME","maryland":"MD",
+  "massachusetts":"MA","michigan":"MI","minnesota":"MN","mississippi":"MS",
+  "missouri":"MO","montana":"MT","nebraska":"NE","nevada":"NV","new hampshire":"NH",
+  "new jersey":"NJ","new mexico":"NM","new york":"NY","north carolina":"NC",
+  "north dakota":"ND","ohio":"OH","oklahoma":"OK","oregon":"OR","pennsylvania":"PA",
+  "rhode island":"RI","south carolina":"SC","south dakota":"SD","tennessee":"TN",
+  "texas":"TX","utah":"UT","vermont":"VT","virginia":"VA","washington":"WA",
+  "west virginia":"WV","wisconsin":"WI","wyoming":"WY",
+};
+
+function normalizeState(val) {
+  if (!val) return "";
+  const lower = val.trim().toLowerCase();
+  return STATE_MAP[lower] || val;
+}
+
 function getCardStage(row) {
   const status = (row.Status || "").toLowerCase().trim();
   if (HIDDEN_STATUSES.includes(status)) return null;
@@ -78,7 +100,11 @@ export default function KanbanBoard() {
   useEffect(() => {
     if (filteredData && filteredData.length > 0) return;
     if (!data) return;
-    const rows = data.breakDowns.map((item, index) => ({ ...item, rowIndex: index }));
+    const rows = data.breakDowns.map((item, index) => ({
+      ...item,
+      State: normalizeState(item.State),
+      rowIndex: index,
+    }));
     setFilteredData(rows.filter((r) => getCardStage(r) !== null));
     if (data.categories) setCategoriesAndSubcategories(data.categories);
   }, [data]);
