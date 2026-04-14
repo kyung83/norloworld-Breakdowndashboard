@@ -1,19 +1,30 @@
 // =============================================================================
-// KanbanBoard.jsx — v2
+// KanbanBoard.jsx — v3
 // NEW FILE — does not modify FilteredTable.jsx, BreakdownsContext.jsx,
 // Providers.jsx, MainForm.jsx, or the Apps Script endpoint.
 //
-// STAGE PLACEMENT based on actual Google Sheet column values:
-//   Column 1 – Roadside Requested : Status is blank/empty
-//   Column 2 – Diagnostics        : has Repair Category OR Assigned To Dashboard
-//                                   but no Service Provider yet
-//   Column 3 – In Progress        : Status = "In progress" OR has Service Provider
-//   Hidden                        : Status = "Complete" | "n/a" | "test"
+// STAGE PLACEMENT (data-driven, no manual advance except Stage 2 override):
+//   STAGE_1 – Roadside Requested & Diagnostics
+//             Status blank AND Service Provider blank
+//   STAGE_2 – In Progress
+//             Status = "In progress" AND Service Provider filled
+//             AND On-Location != "Arrived" AND Repairs Finished blank
+//   STAGE_3 – Repairs Complete, Waiting on Cost
+//             Status = "In progress" AND (On-Location = "Arrived" OR
+//             Repairs Finished has value)
+//   HIDDEN  – Status = "Complete" | "n/a" | "test"
 //
-// ADVANCE logic:
-//   Stage 1 → 2 : saves diagnostic fields (card moves automatically)
-//   Stage 2 → 3 : sets Status = "In progress"
-//   Stage 3 → ✓ : sets Status = "Complete", card disappears
+// ADVANCE VALIDATION:
+//   Stage 1 → 2 : requires A-H, K, L, N, O (Breakdown Date, Driver Name,
+//                 Truck#, Trailer#, State, City, Repair Type, Assigned To,
+//                 Repair Needed, Assigned To Dashboard, Service Provider)
+//   Stage 2 → 3 : auto when On-Location="Arrived" OR Repairs Finished filled
+//                 Manual override button shown only when BOTH are blank,
+//                 requires Phone Number (Col P) to be filled
+//   Stage 3 → ✓ : requires Total (Col T)
+//
+// Col M (Repair Category) — hidden from UI, auto-mirrors Col H (Repair Type)
+// State normalization — full names → abbreviations (voice agent fix)
 // =============================================================================
 
 import React, { useState, useEffect } from "react";
@@ -27,15 +38,14 @@ const END_POINT =
   "https://script.google.com/macros/s/AKfycbzX6QjhoOsurYDexFE99aCOl1NPJ-MTmjw2U8i7mhNuMaLlJUH7I6Gda0dAOAORnCbB/exec";
 
 const STAGES = [
-  { key: "STAGE_1", label: "Roadside Requested", accent: "#60a5fa" },
-  { key: "STAGE_2", label: "Diagnostics",         accent: "#a78bfa" },
-  { key: "STAGE_3", label: "In Progress",         accent: "#34d399" },
+  { key: "STAGE_1", label: "Roadside Requested & Diagnostics", accent: "#60a5fa" },
+  { key: "STAGE_2", label: "In Progress",                       accent: "#a78bfa" },
+  { key: "STAGE_3", label: "Repairs Complete, Waiting on Cost", accent: "#34d399" },
 ];
 
 const HIDDEN_STATUSES = ["complete", "n/a", "test"];
 
-// Normalize full state names to abbreviations — dashboard side only
-// Voice agent submits "Michigan", sheet/dropdown expects "MI"
+// ── State normalization (voice agent sends full names) ────────────────────────
 const STATE_MAP = {
   "alabama":"AL","alaska":"AK","arizona":"AZ","arkansas":"AR","california":"CA",
   "colorado":"CO","connecticut":"CT","delaware":"DE","florida":"FL","georgia":"GA",
@@ -49,21 +59,71 @@ const STATE_MAP = {
   "texas":"TX","utah":"UT","vermont":"VT","virginia":"VA","washington":"WA",
   "west virginia":"WV","wisconsin":"WI","wyoming":"WY",
 };
-
 function normalizeState(val) {
   if (!val) return "";
   const lower = val.trim().toLowerCase();
   return STATE_MAP[lower] || val;
 }
 
+// ── Stage placement logic ─────────────────────────────────────────────────────
 function getCardStage(row) {
-  const status = (row.Status || "").toLowerCase().trim();
+  const status     = (row.Status || "").toLowerCase().trim();
+  const onLocation = (row["On-Location"] || "").trim();
+  const rolling    = (row["Repairs Finished"] || "").trim();
+
   if (HIDDEN_STATUSES.includes(status)) return null;
-  if (status === "in progress" || row["Service Provider"] || row["ETA"]) return "STAGE_3";
-  if (row["Assigned To Dashboard"] || row["Repair Category"] || row["Repair Needed"]) return "STAGE_2";
+
+  // Stage 3: repairs complete (arrived or rolling stamped)
+  if (
+    status === "in progress" &&
+    row["Service Provider"] &&
+    (onLocation === "Arrived" || rolling !== "")
+  ) return "STAGE_3";
+
+  // Stage 2: in progress, vendor assigned, not yet arrived/rolling
+  if (status === "in progress" && row["Service Provider"]) return "STAGE_2";
+
+  // Stage 1: everything else that isn't hidden
   return "STAGE_1";
 }
 
+// ── Stage 1 → 2 validation ────────────────────────────────────────────────────
+// Required: BreakDown Date, Driver Name, Truck#, Trailer#, State, City,
+//           Repair Type, Assigned To (Col K), Repair Needed, Assigned To Dashboard, Service Provider
+function validateStage1(row, editState) {
+  const merged = { ...row, ...(editState || {}) };
+  const missing = [];
+  if (!merged["BreakDown Date"])       missing.push("Breakdown Date");
+  if (!merged["Driver Name"])          missing.push("Driver Name");
+  if (!merged["Truck #"])              missing.push("Truck #");
+  if (!merged["Trailer #"])            missing.push("Trailer #");
+  if (!merged["State"])                missing.push("State");
+  if (!merged["City"])                 missing.push("City");
+  if (!merged["Repair Type"])          missing.push("Repair Type");
+  if (!merged["Repair Needed"])        missing.push("Repair Needed");
+  if (!merged["Assigned To Dashboard"]) missing.push("Assigned To");
+  if (!merged["Service Provider"])     missing.push("Service Provider");
+  return missing;
+}
+
+// ── Stage 2 → 3 manual override validation ────────────────────────────────────
+// Required: Phone Number
+function validateStage2(row, editState) {
+  const merged = { ...row, ...(editState || {}) };
+  const missing = [];
+  if (!merged["Phone Number"]) missing.push("Phone Number");
+  return missing;
+}
+
+// ── Stage 3 → Complete validation ─────────────────────────────────────────────
+function validateStage3(row, editState) {
+  const merged = { ...row, ...(editState || {}) };
+  const missing = [];
+  if (!merged["Total"]) missing.push("Total Cost");
+  return missing;
+}
+
+// ── Priority (hours since breakdown) ─────────────────────────────────────────
 function getPriority(breakdownDate) {
   const hours = dayjs().diff(dayjs(breakdownDate), "hour");
   if (hours >= 6) return "HIGH";
@@ -83,6 +143,9 @@ const ETA_OPTIONS = [
   "Route to nearest service provider ETA 1 hour",
 ];
 
+// =============================================================================
+// Main component
+// =============================================================================
 export default function KanbanBoard() {
   const [{ data, loading, error }] = useAxios(END_POINT + "?route=getBreakdowns");
   const [, executePost] = useAxios(
@@ -96,6 +159,7 @@ export default function KanbanBoard() {
   const [expandedId, setExpandedId] = useState(null);
   const [editState, setEditState]   = useState({});
   const [saving, setSaving]         = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
 
   useEffect(() => {
     if (filteredData && filteredData.length > 0) return;
@@ -130,9 +194,8 @@ export default function KanbanBoard() {
       repairType:      merged["Repair Type"],
       description:     merged["Description"],
       driverName:      merged["Driver Name"],
-      repairCategory:  merged["Repair Category"],
+      repairCategory:  merged["Repair Type"], // Col M mirrors Col H silently
       repairNeeded:    merged["Repair Needed"],
-      repairCategory:  merged["Repair Type"],
       serviceProvider: merged["Service Provider"],
       phoneNumber:     merged["Phone Number"],
       state:           merged.State,
@@ -152,19 +215,46 @@ export default function KanbanBoard() {
         prev.map((r) => (r.rowIndex === row.rowIndex ? { ...r, ...merged } : r))
       );
       setEditState((prev) => { const n = { ...prev }; delete n[row.rowIndex]; return n; });
+      setValidationErrors((prev) => { const n = { ...prev }; delete n[row.rowIndex]; return n; });
     } catch (err) {
       console.error("KanbanBoard save error:", err);
     }
     setSaving(false);
   };
 
-  const advanceCard = (row, stageKey) => {
-    if (stageKey === "STAGE_1") saveRow(row);
-    if (stageKey === "STAGE_2") saveRow(row, { Status: "In progress" });
+  // Stage 1 save — validates required fields before allowing save that moves card to Stage 2
+  const handleStage1Save = (row) => {
+    const missing = validateStage1(row, editState[row.rowIndex]);
+    if (missing.length > 0) {
+      setValidationErrors((prev) => ({ ...prev, [row.rowIndex]: missing }));
+      return;
+    }
+    setValidationErrors((prev) => { const n = { ...prev }; delete n[row.rowIndex]; return n; });
+    // Status set to "In progress" so card moves to Stage 2 automatically
+    saveRow(row, { Status: "In progress" });
     setExpandedId(null);
   };
 
-  const markComplete = (row) => {
+  // Stage 2 manual override — only available when On-Location and Repairs Finished are both blank
+  const handleStage2ManualAdvance = (row) => {
+    const missing = validateStage2(row, editState[row.rowIndex]);
+    if (missing.length > 0) {
+      setValidationErrors((prev) => ({ ...prev, [row.rowIndex]: missing }));
+      return;
+    }
+    setValidationErrors((prev) => { const n = { ...prev }; delete n[row.rowIndex]; return n; });
+    // Write On-Location = "Arrived" to move card to Stage 3
+    saveRow(row, { "On-Location": "Arrived" });
+    setExpandedId(null);
+  };
+
+  // Stage 3 mark complete — validates Total before removing card
+  const handleMarkComplete = (row) => {
+    const missing = validateStage3(row, editState[row.rowIndex]);
+    if (missing.length > 0) {
+      setValidationErrors((prev) => ({ ...prev, [row.rowIndex]: missing }));
+      return;
+    }
     saveRow(row, { Status: "Complete" });
     setFilteredData((prev) => prev.filter((r) => r.rowIndex !== row.rowIndex));
     setExpandedId(null);
@@ -185,7 +275,7 @@ export default function KanbanBoard() {
       </div>
 
       <div style={s.board}>
-        {STAGES.map((stage, stageIdx) => {
+        {STAGES.map((stage) => {
           const cards = filteredData.filter((r) => getCardStage(r) === stage.key);
           return (
             <div key={stage.key} style={s.col}>
@@ -201,7 +291,6 @@ export default function KanbanBoard() {
                     key={row.rowIndex}
                     row={row}
                     stage={stage}
-                    isLastStage={stageIdx === STAGES.length - 1}
                     expanded={expandedId === row.rowIndex}
                     onToggle={() => setExpandedId(expandedId === row.rowIndex ? null : row.rowIndex)}
                     editState={editState[row.rowIndex] || {}}
@@ -210,9 +299,11 @@ export default function KanbanBoard() {
                     apiData={data}
                     categoriesAndSubcategories={categoriesAndSubcategories}
                     onSave={() => saveRow(row)}
-                    onAdvance={() => advanceCard(row, stage.key)}
-                    onComplete={() => markComplete(row)}
+                    onStage1Save={() => handleStage1Save(row)}
+                    onStage2Advance={() => handleStage2ManualAdvance(row)}
+                    onComplete={() => handleMarkComplete(row)}
                     saving={saving}
+                    errors={validationErrors[row.rowIndex] || []}
                   />
                 ))}
               </div>
@@ -226,10 +317,14 @@ export default function KanbanBoard() {
   );
 }
 
+// =============================================================================
+// BreakdownCard
+// =============================================================================
 function BreakdownCard({
-  row, stage, isLastStage, expanded, onToggle,
+  row, stage, expanded, onToggle,
   editState, setField, getField, apiData,
-  categoriesAndSubcategories, onSave, onAdvance, onComplete, saving,
+  categoriesAndSubcategories, onSave, onStage1Save,
+  onStage2Advance, onComplete, saving, errors,
 }) {
   const pri      = getPriority(row["BreakDown Date"]);
   const priStyle = PRI[pri];
@@ -242,6 +337,12 @@ function BreakdownCard({
   const initials = row["Assigned To Dashboard"]
     ? row["Assigned To Dashboard"].split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
     : "—";
+
+  // Stage 2 manual override only shows when both On-Location and Repairs Finished are blank
+  const showManualAdvance =
+    stage.key === "STAGE_2" &&
+    !row["On-Location"] &&
+    !row["Repairs Finished"];
 
   return (
     <div style={{ ...s.card, borderLeftColor: priStyle.border }}>
@@ -259,8 +360,10 @@ function BreakdownCard({
         <div style={s.cardLoc}>{row.City ? `${row.City}, ${row.State}` : row.State || "—"}</div>
         <div style={s.cardTags}>
           {row["Repair Type"] && <span style={{ ...s.tag, ...s.tagRepair }}>{row["Repair Type"]}</span>}
+          {row["Service Provider"] && <span style={{ ...s.tag, color: "#a78bfa", borderColor: "#2d1f5f", background: "#1a1035" }}>{row["Service Provider"]}</span>}
           {row["ETA"] && <span style={{ ...s.tag, color: "#fbbf24", borderColor: "#7c4a00", background: "#3b2800" }}>ETA: {row["ETA"]}</span>}
           {row["On-Location"] === "Arrived" && <span style={{ ...s.tag, color: "#4ade80", borderColor: "#14532d", background: "#052e16" }}>On-Location ✓</span>}
+          {row["Repairs Finished"] && <span style={{ ...s.tag, color: "#34d399", borderColor: "#0f3528", background: "#081f18" }}>Rolling ✓</span>}
         </div>
         <div style={s.cardFooter}>
           <div style={s.assignedBubble}>{initials}</div>
@@ -270,18 +373,39 @@ function BreakdownCard({
 
       {expanded && (
         <div style={s.cardDetail}>
+          {errors.length > 0 && (
+            <div style={s.errorBanner}>
+              Required to advance: {errors.join(", ")}
+            </div>
+          )}
           <EditFields
             row={row} stage={stage}
             editState={editState} setField={setField} getField={getField}
             apiData={apiData} categoriesAndSubcategories={categoriesAndSubcategories}
           />
           <div style={s.detActions}>
-            <button style={{ ...s.detBtn, ...s.btnSave }} onClick={onSave} disabled={saving}>Save</button>
-            {!isLastStage && (
-              <button style={{ ...s.detBtn, ...s.btnAdv }} onClick={onAdvance} disabled={saving}>Advance →</button>
+            {/* Stage 1 — Save advances the card if all required fields are filled */}
+            {stage.key === "STAGE_1" && (
+              <>
+                <button style={{ ...s.detBtn, ...s.btnSave }} onClick={onSave} disabled={saving}>Save</button>
+                <button style={{ ...s.detBtn, ...s.btnAdv }} onClick={onStage1Save} disabled={saving}>Save & Advance →</button>
+              </>
             )}
-            {isLastStage && (
-              <button style={{ ...s.detBtn, ...s.btnComplete }} onClick={onComplete} disabled={saving}>Mark Complete</button>
+            {/* Stage 2 — Save only; manual advance shown only when On-Location and Rolling are both blank */}
+            {stage.key === "STAGE_2" && (
+              <>
+                <button style={{ ...s.detBtn, ...s.btnSave }} onClick={onSave} disabled={saving}>Save</button>
+                {showManualAdvance && (
+                  <button style={{ ...s.detBtn, ...s.btnAdv }} onClick={onStage2Advance} disabled={saving}>Advance →</button>
+                )}
+              </>
+            )}
+            {/* Stage 3 — Save and Mark Complete */}
+            {stage.key === "STAGE_3" && (
+              <>
+                <button style={{ ...s.detBtn, ...s.btnSave }} onClick={onSave} disabled={saving}>Save</button>
+                <button style={{ ...s.detBtn, ...s.btnComplete }} onClick={onComplete} disabled={saving}>Mark Complete</button>
+              </>
             )}
           </div>
         </div>
@@ -290,118 +414,156 @@ function BreakdownCard({
   );
 }
 
+// =============================================================================
+// EditFields — fields shown per stage
+// =============================================================================
 function EditFields({ row, stage, editState, setField, getField, apiData, categoriesAndSubcategories }) {
   const ri = row.rowIndex;
 
-  if (stage.key === "STAGE_1") return (
-    <div style={s.fieldsGrid}>
-      <FieldWrap label="Breakdown Date">
-        <input type="date" style={s.input}
-          value={dayjs(getField(row, "BreakDown Date")).format("YYYY-MM-DD")}
-          max={dayjs().format("YYYY-MM-DD")}
-          onChange={(e) => setField(ri, "BreakDown Date", e.target.value)} />
-      </FieldWrap>
-      <FieldWrap label="Driver Name">
-        <Select size="small" variant="outlined" value={getField(row, "Driver Name")}
-          onChange={(e) => setField(ri, "Driver Name", e.target.value)} sx={muiSx}>
-          {apiData.drivers.map((n, i) => <MenuItem key={i} value={n}>{n}</MenuItem>)}
-        </Select>
-      </FieldWrap>
-      <FieldWrap label="Truck #">
-        <input style={s.input} value={getField(row, "Truck #")} onChange={(e) => setField(ri, "Truck #", e.target.value)} />
-      </FieldWrap>
-      <FieldWrap label="Trailer #">
-        <input style={s.input} value={getField(row, "Trailer #")} onChange={(e) => setField(ri, "Trailer #", e.target.value)} />
-      </FieldWrap>
-      <FieldWrap label="State">
-        <Select size="small" variant="outlined" value={getField(row, "State")}
-          onChange={(e) => setField(ri, "State", e.target.value)} sx={muiSx}>
-          {apiData.states.map((n, i) => <MenuItem key={i} value={n}>{n}</MenuItem>)}
-        </Select>
-      </FieldWrap>
-      <FieldWrap label="City">
-        <input style={s.input} value={getField(row, "City")} onChange={(e) => setField(ri, "City", e.target.value)} />
-      </FieldWrap>
-      <FieldWrap label="Repair Type">
-        <input style={s.input} value={getField(row, "Repair Type")} onChange={(e) => setField(ri, "Repair Type", e.target.value)} />
-      </FieldWrap>
-      <FieldWrap label="Description" fullWidth>
-        <textarea style={{ ...s.input, height: 56, resize: "vertical" }}
-          value={getField(row, "Description")} onChange={(e) => setField(ri, "Description", e.target.value)} />
-      </FieldWrap>
-      {row["File Attachment"] && (
-        <FieldWrap label="Attachment" fullWidth>
-          {row["File Attachment"].split("\n").map((url, i) => (
-            <a key={i} href={url.trim()} target="_blank" rel="noreferrer"
-              style={{ color: "#60a5fa", fontSize: 12, display: "block" }}>File {i + 1}</a>
-          ))}
+  // ── Stage 1: Roadside Requested & Diagnostics ─────────────────────────────
+  if (stage.key === "STAGE_1") {
+    return (
+      <div style={s.fieldsGrid}>
+        {/* Roadside fields */}
+        <FieldWrap label="Breakdown Date">
+          <input type="date" style={s.input}
+            value={dayjs(getField(row, "BreakDown Date")).format("YYYY-MM-DD")}
+            max={dayjs().format("YYYY-MM-DD")}
+            onChange={(e) => setField(ri, "BreakDown Date", e.target.value)} />
         </FieldWrap>
-      )}
+        <FieldWrap label="Driver Name">
+          <Select size="small" variant="outlined" value={getField(row, "Driver Name")}
+            onChange={(e) => setField(ri, "Driver Name", e.target.value)} sx={muiSx}>
+            {apiData.drivers.map((n, i) => <MenuItem key={i} value={n}>{n}</MenuItem>)}
+          </Select>
+        </FieldWrap>
+        <FieldWrap label="Truck #">
+          <input style={s.input} value={getField(row, "Truck #")}
+            onChange={(e) => setField(ri, "Truck #", e.target.value)} />
+        </FieldWrap>
+        <FieldWrap label="Trailer #">
+          <input style={s.input} value={getField(row, "Trailer #")}
+            onChange={(e) => setField(ri, "Trailer #", e.target.value)} />
+        </FieldWrap>
+        <FieldWrap label="State">
+          <Select size="small" variant="outlined" value={getField(row, "State")}
+            onChange={(e) => setField(ri, "State", e.target.value)} sx={muiSx}>
+            {apiData.states.map((n, i) => <MenuItem key={i} value={n}>{n}</MenuItem>)}
+          </Select>
+        </FieldWrap>
+        <FieldWrap label="City">
+          <input style={s.input} value={getField(row, "City")}
+            onChange={(e) => setField(ri, "City", e.target.value)} />
+        </FieldWrap>
+        <FieldWrap label="Repair Type">
+          <input style={s.input} value={getField(row, "Repair Type")}
+            onChange={(e) => setField(ri, "Repair Type", e.target.value)} />
+        </FieldWrap>
+        <FieldWrap label="Description" fullWidth>
+          <textarea style={{ ...s.input, height: 56, resize: "vertical" }}
+            value={getField(row, "Description")}
+            onChange={(e) => setField(ri, "Description", e.target.value)} />
+        </FieldWrap>
+        {row["File Attachment"] && (
+          <FieldWrap label="Attachment" fullWidth>
+            {row["File Attachment"].split("\n").map((url, i) => (
+              <a key={i} href={url.trim()} target="_blank" rel="noreferrer"
+                style={{ color: "#60a5fa", fontSize: 12, display: "block" }}>File {i + 1}</a>
+            ))}
+          </FieldWrap>
+        )}
 
-      {/* ── Diagnostics fields (Stage 2) consolidated into Stage 1 card ── */}
-      <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #1e2d3d", margin: "4px 0 8px", paddingTop: 10 }}>
-        <div style={{ fontSize: 10, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-          Diagnostics
+        {/* Diagnostics section */}
+        <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #1e2d3d", marginTop: 4, paddingTop: 10 }}>
+          <div style={{ fontSize: 10, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+            Diagnostics
+          </div>
         </div>
+        <FieldWrap label="Repair Needed *" fullWidth>
+          <Select size="small" variant="outlined"
+            value={getField(row, "Repair Needed")}
+            onChange={(e) => setField(ri, "Repair Needed", e.target.value)}
+            sx={{ ...muiSx, minWidth: "100%" }}>
+            {(categoriesAndSubcategories[getField(row, "Repair Type")] || []).map((sub, i) => (
+              <MenuItem key={i} value={sub}>{sub}</MenuItem>
+            ))}
+          </Select>
+        </FieldWrap>
+        <FieldWrap label="Assigned To *">
+          <Select size="small" variant="outlined" value={getField(row, "Assigned To Dashboard")}
+            onChange={(e) => setField(ri, "Assigned To Dashboard", e.target.value)} sx={muiSx}>
+            {apiData.users.map((n, i) => <MenuItem key={i} value={n}>{n}</MenuItem>)}
+          </Select>
+        </FieldWrap>
+
+        {/* Service Provider — required to advance */}
+        <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #1e2d3d", marginTop: 4, paddingTop: 10 }}>
+          <div style={{ fontSize: 10, color: "#60a5fa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+            Service Provider *
+          </div>
+        </div>
+        <FieldWrap label="State">
+          <Select size="small" variant="outlined" value={getField(row, "State")}
+            onChange={(e) => setField(ri, "State", e.target.value)} sx={muiSx}>
+            {apiData.states.map((n, i) => <MenuItem key={i} value={n}>{n}</MenuItem>)}
+          </Select>
+        </FieldWrap>
+        <FieldWrap label="Provider">
+          <Select size="small" variant="outlined" value={getField(row, "Service Provider")}
+            onChange={(e) => {
+              const pd = apiData.providers.find((p) => p["Service Provider"] === e.target.value);
+              setField(ri, "Service Provider", e.target.value);
+              if (pd) setField(ri, "Phone Number", pd["Phone Number"]);
+            }} sx={muiSx}>
+            {apiData.providers
+              .filter((p) => p.State === (editState["State"] ?? row.State))
+              .map((p, i) => <MenuItem key={i} value={p["Service Provider"]}>{p["Service Provider"]}</MenuItem>)}
+          </Select>
+        </FieldWrap>
+        <FieldWrap label="Phone #" fullWidth>
+          <span style={{ fontSize: 13, color: "#60a5fa" }}>
+            {editState["Phone Number"] ??
+              apiData.providers.find((p) => p["Service Provider"] === (editState["Service Provider"] ?? row["Service Provider"]))?.["Phone Number"] ??
+              row["Phone Number"] ?? "—"}
+          </span>
+        </FieldWrap>
+        <FieldWrap label="ETA">
+          <Select size="small" variant="outlined" value={getField(row, "ETA")}
+            onChange={(e) => setField(ri, "ETA", e.target.value)} sx={muiSx}>
+            {ETA_OPTIONS.map((v, i) => <MenuItem key={i} value={v}>{v}</MenuItem>)}
+          </Select>
+        </FieldWrap>
       </div>
-      <FieldWrap label="Assigned To">
-        <Select size="small" variant="outlined" value={getField(row, "Assigned To Dashboard")}
-          onChange={(e) => setField(ri, "Assigned To Dashboard", e.target.value)} sx={muiSx}>
-          {apiData.users.map((n, i) => <MenuItem key={i} value={n}>{n}</MenuItem>)}
-        </Select>
-      </FieldWrap>
-      <FieldWrap label="Repair Needed" fullWidth>
-        <Select size="small" variant="outlined"
-          value={getField(row, "Repair Needed")}
-          onChange={(e) => setField(ri, "Repair Needed", e.target.value)}
-          sx={{ ...muiSx, minWidth: "100%" }}>
-          {(categoriesAndSubcategories[getField(row, "Repair Type")] || []).map((sub, i) => (
-            <MenuItem key={i} value={sub}>{sub}</MenuItem>
-          ))}
-        </Select>
-      </FieldWrap>
-    </div>
-  );
+    );
+  }
 
-  if (stage.key === "STAGE_2") return (
-    <div style={s.fieldsGrid}>
-      <FieldWrap label="Driver Name">
-        <Select size="small" variant="outlined" value={getField(row, "Driver Name")}
-          onChange={(e) => setField(ri, "Driver Name", e.target.value)} sx={muiSx}>
-          {apiData.drivers.map((n, i) => <MenuItem key={i} value={n}>{n}</MenuItem>)}
-        </Select>
-      </FieldWrap>
-      <FieldWrap label="Repair Category">
-        <Select size="small" variant="outlined" value={getField(row, "Repair Category")}
-          onChange={(e) => setField(ri, "Repair Category", e.target.value)} sx={muiSx}>
-          {Object.keys(categoriesAndSubcategories).map((c, i) => <MenuItem key={i} value={c}>{c}</MenuItem>)}
-        </Select>
-      </FieldWrap>
-      <FieldWrap label="Repair Needed" fullWidth>
-        <input style={s.input} value={getField(row, "Repair Needed")} onChange={(e) => setField(ri, "Repair Needed", e.target.value)} />
-      </FieldWrap>
-      <FieldWrap label="Assigned To">
-        <Select size="small" variant="outlined" value={getField(row, "Assigned To Dashboard")}
-          onChange={(e) => setField(ri, "Assigned To Dashboard", e.target.value)} sx={muiSx}>
-          {apiData.users.map((n, i) => <MenuItem key={i} value={n}>{n}</MenuItem>)}
-        </Select>
-      </FieldWrap>
-    </div>
-  );
-
-  if (stage.key === "STAGE_3") {
+  // ── Stage 2: In Progress ──────────────────────────────────────────────────
+  if (stage.key === "STAGE_2") {
     const selectedState     = editState["State"] ?? row.State;
     const filteredProviders = apiData.providers.filter((p) => p.State === selectedState);
     const currentProvider   = editState["Service Provider"] ?? row["Service Provider"];
     const providerData      = apiData.providers.find((p) => p["Service Provider"] === currentProvider);
     const displayPhone      = editState["Phone Number"] ?? providerData?.["Phone Number"] ?? row["Phone Number"] ?? "";
-    const handleProviderChange = (val) => {
-      const pd = apiData.providers.find((p) => p["Service Provider"] === val);
-      setField(ri, "Service Provider", val);
-      if (pd) setField(ri, "Phone Number", pd["Phone Number"]);
-    };
+
     return (
       <div style={s.fieldsGrid}>
+        {/* Read-only summary */}
+        <FieldWrap label="Driver" fullWidth>
+          <span style={{ fontSize: 13, color: "#94a3b8" }}>{row["Driver Name"]}</span>
+        </FieldWrap>
+        <FieldWrap label="Repair Type">
+          <span style={{ fontSize: 13, color: "#94a3b8" }}>{row["Repair Type"]}</span>
+        </FieldWrap>
+        <FieldWrap label="Repair Needed">
+          <span style={{ fontSize: 13, color: "#94a3b8" }}>{row["Repair Needed"] || "—"}</span>
+        </FieldWrap>
+
+        {/* Service provider fields */}
+        <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #1e2d3d", marginTop: 4, paddingTop: 10 }}>
+          <div style={{ fontSize: 10, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+            In Progress
+          </div>
+        </div>
         <FieldWrap label="State">
           <Select size="small" variant="outlined" value={getField(row, "State")}
             onChange={(e) => setField(ri, "State", e.target.value)} sx={muiSx}>
@@ -410,12 +572,18 @@ function EditFields({ row, stage, editState, setField, getField, apiData, catego
         </FieldWrap>
         <FieldWrap label="Service Provider">
           <Select size="small" variant="outlined" value={getField(row, "Service Provider")}
-            onChange={(e) => handleProviderChange(e.target.value)} sx={muiSx}>
+            onChange={(e) => {
+              const pd = apiData.providers.find((p) => p["Service Provider"] === e.target.value);
+              setField(ri, "Service Provider", e.target.value);
+              if (pd) setField(ri, "Phone Number", pd["Phone Number"]);
+            }} sx={muiSx}>
             {filteredProviders.map((p, i) => <MenuItem key={i} value={p["Service Provider"]}>{p["Service Provider"]}</MenuItem>)}
           </Select>
         </FieldWrap>
-        <FieldWrap label="Phone #" fullWidth>
-          <span style={{ fontSize: 13, color: "#60a5fa" }}>{displayPhone || "—"}</span>
+        <FieldWrap label="Phone # *" fullWidth>
+          <input style={s.input} value={displayPhone}
+            onChange={(e) => setField(ri, "Phone Number", e.target.value)}
+            placeholder="Required to advance" />
         </FieldWrap>
         <FieldWrap label="ETA">
           <Select size="small" variant="outlined" value={getField(row, "ETA")}
@@ -424,21 +592,68 @@ function EditFields({ row, stage, editState, setField, getField, apiData, catego
           </Select>
         </FieldWrap>
         <FieldWrap label="On-Location">
-          <Select size="small" variant="outlined" value={getField(row, "On-Location")}
-            onChange={(e) => setField(ri, "On-Location", e.target.value)} sx={muiSx}>
-            <MenuItem value="Arrived">Arrived</MenuItem>
-          </Select>
+          <span style={{ fontSize: 13, color: row["On-Location"] === "Arrived" ? "#4ade80" : "#475569" }}>
+            {row["On-Location"] || "Pending"}
+          </span>
         </FieldWrap>
-        <FieldWrap label="Total ($)">
-          <input style={s.input} value={getField(row, "Total")}
-            onChange={(e) => setField(ri, "Total", e.target.value)} placeholder="0.00" />
+        <FieldWrap label="Repairs Finished">
+          <span style={{ fontSize: 13, color: row["Repairs Finished"] ? "#4ade80" : "#475569" }}>
+            {row["Repairs Finished"] || "Pending"}
+          </span>
         </FieldWrap>
       </div>
     );
   }
+
+  // ── Stage 3: Repairs Complete, Waiting on Cost ────────────────────────────
+  if (stage.key === "STAGE_3") {
+    return (
+      <div style={s.fieldsGrid}>
+        {/* Read-only summary */}
+        <FieldWrap label="Driver" fullWidth>
+          <span style={{ fontSize: 13, color: "#94a3b8" }}>{row["Driver Name"]}</span>
+        </FieldWrap>
+        <FieldWrap label="Repair Type">
+          <span style={{ fontSize: 13, color: "#94a3b8" }}>{row["Repair Type"]}</span>
+        </FieldWrap>
+        <FieldWrap label="Repair Needed">
+          <span style={{ fontSize: 13, color: "#94a3b8" }}>{row["Repair Needed"] || "—"}</span>
+        </FieldWrap>
+        <FieldWrap label="Service Provider">
+          <span style={{ fontSize: 13, color: "#94a3b8" }}>{row["Service Provider"] || "—"}</span>
+        </FieldWrap>
+        <FieldWrap label="Phone #">
+          <span style={{ fontSize: 13, color: "#60a5fa" }}>{row["Phone Number"] || "—"}</span>
+        </FieldWrap>
+        <FieldWrap label="On-Location">
+          <span style={{ fontSize: 13, color: "#4ade80" }}>{row["On-Location"] || "—"}</span>
+        </FieldWrap>
+        <FieldWrap label="Repairs Finished">
+          <span style={{ fontSize: 13, color: "#4ade80" }}>{row["Repairs Finished"] || "—"}</span>
+        </FieldWrap>
+
+        {/* Cost entry */}
+        <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #1e2d3d", marginTop: 4, paddingTop: 10 }}>
+          <div style={{ fontSize: 10, color: "#34d399", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+            Enter Cost to Close
+          </div>
+        </div>
+        <FieldWrap label="Total Cost * ($)" fullWidth>
+          <input style={{ ...s.input, fontSize: 14 }}
+            value={getField(row, "Total")}
+            onChange={(e) => setField(ri, "Total", e.target.value)}
+            placeholder="Enter total repair cost" />
+        </FieldWrap>
+      </div>
+    );
+  }
+
   return null;
 }
 
+// =============================================================================
+// Helpers
+// =============================================================================
 function FieldWrap({ label, children, fullWidth }) {
   return (
     <div style={{ ...s.field, gridColumn: fullWidth ? "1 / -1" : undefined }}>
@@ -466,9 +681,13 @@ const muiSx = {
   backgroundColor: "#1a2533",
 };
 
+// =============================================================================
+// Styles
+// =============================================================================
 const s = {
   wrap:           { background: "#0f1923", minHeight: "100vh", fontFamily: "'Segoe UI', system-ui, sans-serif", position: "relative" },
   errorMsg:       { color: "#f87171", padding: 20, fontSize: 14 },
+  errorBanner:    { background: "#3b1111", border: "1px solid #7f1d1d", borderRadius: 6, color: "#f87171", fontSize: 11, padding: "8px 10px", marginBottom: 10 },
   toolbar:        { background: "#0d1822", padding: "10px 20px", display: "flex", alignItems: "center", gap: 12, borderBottom: "1px solid #1e2d3d" },
   toolbarTitle:   { fontSize: 14, fontWeight: 500, color: "#e2e8f0", flex: 1 },
   statPill:       { background: "#1a2533", border: "1px solid #2a3a4d", borderRadius: 6, padding: "5px 12px", display: "flex", alignItems: "center", gap: 6 },
@@ -476,7 +695,7 @@ const s = {
   col:            { background: "#111e2b", border: "1px solid #1e2d3d", borderRadius: 10, overflow: "hidden" },
   colHdr:         { padding: "12px 14px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid #1e2d3d" },
   colDot:         { width: 9, height: 9, borderRadius: "50%", flexShrink: 0 },
-  colName:        { fontSize: 12, fontWeight: 500, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.06em", flex: 1 },
+  colName:        { fontSize: 11, fontWeight: 500, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.05em", flex: 1 },
   colCount:       { fontSize: 11, padding: "2px 7px", borderRadius: 10, border: "1px solid #2a3a4d", background: "#1a2533" },
   colBody:        { padding: 10, display: "flex", flexDirection: "column", gap: 8, minHeight: 80 },
   emptyCol:       { padding: "20px 10px", textAlign: "center", fontSize: 12, color: "#2a3a4d" },
