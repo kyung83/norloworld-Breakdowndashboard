@@ -132,6 +132,7 @@ export default function KanbanBoard() {
       driverName:      merged["Driver Name"],
       repairCategory:  merged["Repair Category"],
       repairNeeded:    merged["Repair Needed"],
+      repairCategory:  merged["Repair Type"],
       serviceProvider: merged["Service Provider"],
       phoneNumber:     merged["Phone Number"],
       state:           merged.State,
@@ -343,12 +344,6 @@ function EditFields({ row, stage, editState, setField, getField, apiData, catego
           Diagnostics
         </div>
       </div>
-      <FieldWrap label="Repair Category">
-        <Select size="small" variant="outlined" value={getField(row, "Repair Category")}
-          onChange={(e) => setField(ri, "Repair Category", e.target.value)} sx={muiSx}>
-          {Object.keys(categoriesAndSubcategories).map((c, i) => <MenuItem key={i} value={c}>{c}</MenuItem>)}
-        </Select>
-      </FieldWrap>
       <FieldWrap label="Assigned To">
         <Select size="small" variant="outlined" value={getField(row, "Assigned To Dashboard")}
           onChange={(e) => setField(ri, "Assigned To Dashboard", e.target.value)} sx={muiSx}>
@@ -356,8 +351,14 @@ function EditFields({ row, stage, editState, setField, getField, apiData, catego
         </Select>
       </FieldWrap>
       <FieldWrap label="Repair Needed" fullWidth>
-        <input style={s.input} value={getField(row, "Repair Needed")}
-          onChange={(e) => setField(ri, "Repair Needed", e.target.value)} />
+        <Select size="small" variant="outlined"
+          value={getField(row, "Repair Needed")}
+          onChange={(e) => setField(ri, "Repair Needed", e.target.value)}
+          sx={{ ...muiSx, minWidth: "100%" }}>
+          {(categoriesAndSubcategories[getField(row, "Repair Type")] || []).map((sub, i) => (
+            <MenuItem key={i} value={sub}>{sub}</MenuItem>
+          ))}
+        </Select>
       </FieldWrap>
     </div>
   );
