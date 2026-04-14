@@ -310,6 +310,29 @@ function EditFields({ row, stage, editState, setField, getField, apiData, catego
           ))}
         </FieldWrap>
       )}
+
+      {/* ── Diagnostics fields (Stage 2) consolidated into Stage 1 card ── */}
+      <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #1e2d3d", margin: "4px 0 8px", paddingTop: 10 }}>
+        <div style={{ fontSize: 10, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+          Diagnostics
+        </div>
+      </div>
+      <FieldWrap label="Repair Category">
+        <Select size="small" variant="outlined" value={getField(row, "Repair Category")}
+          onChange={(e) => setField(ri, "Repair Category", e.target.value)} sx={muiSx}>
+          {Object.keys(categoriesAndSubcategories).map((c, i) => <MenuItem key={i} value={c}>{c}</MenuItem>)}
+        </Select>
+      </FieldWrap>
+      <FieldWrap label="Assigned To">
+        <Select size="small" variant="outlined" value={getField(row, "Assigned To Dashboard")}
+          onChange={(e) => setField(ri, "Assigned To Dashboard", e.target.value)} sx={muiSx}>
+          {apiData.users.map((n, i) => <MenuItem key={i} value={n}>{n}</MenuItem>)}
+        </Select>
+      </FieldWrap>
+      <FieldWrap label="Repair Needed" fullWidth>
+        <input style={s.input} value={getField(row, "Repair Needed")}
+          onChange={(e) => setField(ri, "Repair Needed", e.target.value)} />
+      </FieldWrap>
     </div>
   );
 
