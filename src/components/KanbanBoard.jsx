@@ -160,6 +160,7 @@ export default function KanbanBoard() {
   const [editState, setEditState]   = useState({});
   const [saving, setSaving]         = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
+  const [searchTerms, setSearchTerms] = useState({ STAGE_1: "", STAGE_2: "", STAGE_3: "" });
 
   useEffect(() => {
     if (filteredData && filteredData.length > 0) return;
@@ -277,16 +278,38 @@ export default function KanbanBoard() {
       <div style={s.board}>
         {STAGES.map((stage) => {
           const cards = filteredData.filter((r) => getCardStage(r) === stage.key);
+          const term = (searchTerms[stage.key] || "").toLowerCase().trim();
+          const visibleCards = term
+            ? cards.filter((r) =>
+                (r["Truck #"]       && String(r["Truck #"]).toLowerCase().includes(term))  ||
+                (r["Driver Name"]   && r["Driver Name"].toLowerCase().includes(term))      ||
+                (r["City"]          && r["City"].toLowerCase().includes(term))             ||
+                (r["State"]         && r["State"].toLowerCase().includes(term))            ||
+                (r["Repair Type"]   && r["Repair Type"].toLowerCase().includes(term))
+              )
+            : cards;
           return (
             <div key={stage.key} style={s.col}>
               <div style={s.colHdr}>
                 <div style={{ ...s.colDot, background: stage.accent }} />
                 <span style={s.colName}>{stage.label}</span>
-                <span style={{ ...s.colCount, color: stage.accent }}>{cards.length}</span>
+                <span style={{ ...s.colCount, color: stage.accent }}>{visibleCards.length}</span>
+              </div>
+              <div style={{ padding: "8px 10px 0" }}>
+                <input
+                  style={s.searchInput}
+                  placeholder="Search truck, driver, location, repair..."
+                  value={searchTerms[stage.key]}
+                  onChange={(e) => setSearchTerms((prev) => ({ ...prev, [stage.key]: e.target.value }))}
+                />
               </div>
               <div style={s.colBody}>
-                {cards.length === 0 && <div style={s.emptyCol}>No cases here</div>}
-                {cards.map((row) => (
+                {visibleCards.length === 0 && (
+                  <div style={s.emptyCol}>
+                    {term ? "No matching cases" : "No cases here"}
+                  </div>
+                )}
+                {visibleCards.map((row) => (
                   <BreakdownCard
                     key={row.rowIndex}
                     row={row}
@@ -699,6 +722,7 @@ const s = {
   colCount:       { fontSize: 11, padding: "2px 7px", borderRadius: 10, border: "1px solid #2a3a4d", background: "#1a2533" },
   colBody:        { padding: 10, display: "flex", flexDirection: "column", gap: 8, minHeight: 80 },
   emptyCol:       { padding: "20px 10px", textAlign: "center", fontSize: 12, color: "#2a3a4d" },
+  searchInput:    { width: "100%", background: "#0d1822", border: "1px solid #2a3a4d", borderRadius: 4, color: "#94a3b8", fontSize: 11, padding: "5px 8px", outline: "none", boxSizing: "border-box" },
   card:           { background: "#0d1822", border: "1px solid #1e2d3d", borderLeft: "3px solid", borderRadius: 8, padding: "11px 12px" },
   cardTop:        { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6, marginBottom: 8 },
   cardUnit:       { fontSize: 13, fontWeight: 500, color: "#e2e8f0" },
