@@ -1,9 +1,8 @@
 import { Fragment } from "react";
-import { KanbanBoard, MainForm, Providers } from "./components";
+import { KanbanBoard, Providers } from "./components";
 import { Disclosure, Menu, Transition } from "@headlessui/react";
 import { Bars3Icon, BellIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import {
-  BrowserRouter as Router,
   Route,
   Link,
   Routes,
@@ -22,7 +21,7 @@ const navigation = [
   { name: "Dashboard", href: "/norloworld-Breakdowndashboard/", current: true },
   {
     name: "Providers",
-    href: "/norloworld-Breakdowndashboard/Providers",
+    href: "/norloworld-Breakdowndashboard/providers",
     current: false,
   },
 ];
@@ -224,12 +223,11 @@ function MainContent() {
 <div className="flex flex-col flex-1 w-full">
             <Routes>
               <Route
-                path="norloworld-Breakdowndashboard/"
-                exact
+                path="/norloworld-Breakdowndashboard/"
                 element={<KanbanBoard />}
               />
               <Route
-                path="norloworld-Breakdowndashboard/providers"
+                path="/norloworld-Breakdowndashboard/providers"
                 element={<Providers />}
               />
               {/* Añade más rutas según lo necesites */}

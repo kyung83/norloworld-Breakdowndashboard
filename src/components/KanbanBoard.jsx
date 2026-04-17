@@ -67,7 +67,7 @@ function normalizeState(val) {
 
 // ── Stage placement logic ─────────────────────────────────────────────────────
 function getCardStage(row) {
-  const status     = (row.Status || "").toLowerCase().trim();
+  const status     = String(row.Status || "").toLowerCase().trim();
   const onLocation = (row["On-Location"] || "").trim();
   const rolling    = (row["Repairs Finished"] || "").trim();
 
@@ -351,11 +351,11 @@ function BreakdownCard({
 }) {
   const pri      = getPriority(row["BreakDown Date"]);
   const priStyle = PRI[pri];
-  const hoursAgo = dayjs().diff(dayjs(row["BreakDown Date"]), "hour");
-  const timeLabel =
-    hoursAgo < 1    ? "< 1h ago"
-    : hoursAgo < 24 ? `${hoursAgo}h ago`
-    : dayjs(row["BreakDown Date"]).format("MM/DD");
+const hoursAgo = dayjs().diff(dayjs(row["BreakDown Date"]), "hour");
+  const rawTs = row["TimeStamp (time roadside service was requested)"];
+  const timeLabel = rawTs
+    ? dayjs(rawTs).format("M/D/YYYY h:mm a")
+    : "—";
 
   const initials = row["Assigned To Dashboard"]
     ? row["Assigned To Dashboard"].split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
@@ -735,7 +735,7 @@ const s = {
   tagRepair:      { color: "#7dd3fc", borderColor: "#1e3a5f", background: "#0f2035" },
   cardFooter:     { display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #1a2533", paddingTop: 8, marginTop: 4 },
   assignedBubble: { width: 24, height: 24, borderRadius: "50%", background: "#1e3a5f", display: "flex", alignItems: "center", justifyContent: "center", color: "#60a5fa", fontSize: 9, fontWeight: 500 },
-  cardTime:       { fontSize: 11 },
+cardTime:       { fontSize: 14, fontWeight: 700 },
   cardDetail:     { borderTop: "1px solid #1a2533", marginTop: 10, paddingTop: 10 },
   fieldsGrid:     { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 },
   field:          { display: "flex", flexDirection: "column", gap: 4 },
