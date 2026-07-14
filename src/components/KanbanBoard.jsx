@@ -165,10 +165,9 @@ export default function KanbanBoard() {
   useEffect(() => {
     if (filteredData && filteredData.length > 0) return;
     if (!data) return;
-    const rows = data.breakDowns.map((item, index) => ({
+  const rows = data.breakDowns.map((item) => ({
       ...item,
       State: normalizeState(item.State),
-      rowIndex: index,
     }));
     setFilteredData(rows.filter((r) => getCardStage(r) !== null));
     if (data.categories) setCategoriesAndSubcategories(data.categories);
