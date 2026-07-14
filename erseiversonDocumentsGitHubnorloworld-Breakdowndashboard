@@ -1,0 +1,33 @@
+[35msrc/components/FilteredTable.jsx[m[36m:[m[32m1172[m[36m:[m        (row) => row.[1;31mrowIndex[m === Number(editingRowId)
+[35msrc/components/FilteredTable.jsx[m[36m:[m[32m1192[m[36m:[m    const oldRow = filteredData.find((row) => row.[1;31mrowIndex[m === newRow.[1;31mrowIndex[m);
+[35msrc/components/FilteredTable.jsx[m[36m:[m[32m1213[m[36m:[m          (row) => row.[1;31mrowIndex[m === Number(editingRowId)
+[35msrc/components/FilteredTable.jsx[m[36m:[m[32m1250[m[36m:[m              getRowId={(row) => row.[1;31mrowIndex[m}
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m171[m[36m:[m      [1;31mrowIndex[m: index,
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m181[m[36m:[m  const setField = ([1;31mrowIndex[m, field, value) =>
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m182[m[36m:[m    setEditState((prev) => ({ ...prev, [[1;31mrowIndex[m]: { ...prev[[1;31mrowIndex[m], [field]: value } }));
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m185[m[36m:[m    editState[row.[1;31mrowIndex[m]?.[field] !== undefined
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m186[m[36m:[m      ? editState[row.[1;31mrowIndex[m][field]
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m190[m[36m:[m    const merged = { ...row, ...(editState[row.[1;31mrowIndex[m] || {}), ...overrides };
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m208[m[36m:[m      [1;31mrowIndex[m:        merged.[1;31mrowIndex[m,
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m216[m[36m:[m        prev.map((r) => (r.[1;31mrowIndex[m === row.[1;31mrowIndex[m ? { ...r, ...merged } : r))
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m218[m[36m:[m      setEditState((prev) => { const n = { ...prev }; delete n[row.[1;31mrowIndex[m]; return n; });
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m219[m[36m:[m      setValidationErrors((prev) => { const n = { ...prev }; delete n[row.[1;31mrowIndex[m]; return n; });
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m228[m[36m:[m    const missing = validateStage1(row, editState[row.[1;31mrowIndex[m]);
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m230[m[36m:[m      setValidationErrors((prev) => ({ ...prev, [row.[1;31mrowIndex[m]: missing }));
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m233[m[36m:[m    setValidationErrors((prev) => { const n = { ...prev }; delete n[row.[1;31mrowIndex[m]; return n; });
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m241[m[36m:[m    const missing = validateStage2(row, editState[row.[1;31mrowIndex[m]);
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m243[m[36m:[m      setValidationErrors((prev) => ({ ...prev, [row.[1;31mrowIndex[m]: missing }));
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m246[m[36m:[m    setValidationErrors((prev) => { const n = { ...prev }; delete n[row.[1;31mrowIndex[m]; return n; });
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m254[m[36m:[m    const missing = validateStage3(row, editState[row.[1;31mrowIndex[m]);
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m256[m[36m:[m      setValidationErrors((prev) => ({ ...prev, [row.[1;31mrowIndex[m]: missing }));
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m260[m[36m:[m    setFilteredData((prev) => prev.filter((r) => r.[1;31mrowIndex[m !== row.[1;31mrowIndex[m));
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m314[m[36m:[m                    key={row.[1;31mrowIndex[m}
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m317[m[36m:[m                    expanded={expandedId === row.[1;31mrowIndex[m}
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m318[m[36m:[m                    onToggle={() => setExpandedId(expandedId === row.[1;31mrowIndex[m ? null : row.[1;31mrowIndex[m)}
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m319[m[36m:[m                    editState={editState[row.[1;31mrowIndex[m] || {}}
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m329[m[36m:[m                    errors={validationErrors[row.[1;31mrowIndex[m] || []}
+[35msrc/components/KanbanBoard.jsx[m[36m:[m[32m444[m[36m:[m  const ri = row.[1;31mrowIndex[m;
+[35msrc/components/Providers.jsx[m[36m:[m[32m166[m[36m:[m        const baseRow = providers.find((provider) => provider.[1;31mrowIndex[m === id);
+[35msrc/components/Providers.jsx[m[36m:[m[32m184[m[36m:[m                            provider.[1;31mrowIndex[m === id ? updatedRow : provider
+[35msrc/components/Providers.jsx[m[36m:[m[32m190[m[36m:[m                            provider.[1;31mrowIndex[m === id ? updatedRow : provider
+[35msrc/components/Providers.jsx[m[36m:[m[32m404[m[36m:[m                    getRowId={(row) => row.[1;31mrowIndex[m}
