@@ -396,7 +396,7 @@ export default function providers() {
             </div>
             <ToastContainer />
             <div style={{ height: 400, width: '80%', display: 'flex', justifyContent: 'center' }}>
-                <DataGrid
+<DataGrid
                     rows={filteredProviders}
                     columns={columns}
                     pageSize={5}
@@ -405,6 +405,16 @@ export default function providers() {
                     rowModesModel={rowModesModel}
                     onRowModesModelChange={(newModel) => setRowModesModel(newModel)}
                     onEditCellChangeCommitted={(params) => handleCellChange(params)}
+                    sx={{
+                        color: "#fff",
+                        ".MuiDataGrid-columnHeaderTitle": { color: "#fff", fontWeight: 600 },
+                        ".MuiDataGrid-cell": { color: "#fff" },
+                        ".MuiDataGrid-sortIcon": { color: "#fff" },
+                        ".MuiDataGrid-menuIconButton": { color: "#fff" },
+                        ".MuiTablePagination-root": { color: "#fff" },
+                        ".MuiTablePagination-actions .MuiIconButton-root": { color: "#fff" },
+                        ".MuiDataGrid-actionsCell .MuiSvgIcon-root": { color: "#fff" }
+                    }}
                 />
             </div>
         </div>
