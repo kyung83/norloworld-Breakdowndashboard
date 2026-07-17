@@ -282,8 +282,8 @@ export default function providers() {
                 </p>
             )}
 
-            <div className="flex justify-end w-full">
-                <button
+    <div className="flex justify-center w-full">                
+    <button
                     className="inline-flex rounded-md bg-primary p-1.5 text-primary-hover hover:bg-primary-hover outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-primary text-sm font-medium leading-6 text-white font-sans"
                     onClick={() => handleButtonClick()}
                 >
