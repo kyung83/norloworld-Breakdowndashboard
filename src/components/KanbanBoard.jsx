@@ -478,8 +478,10 @@ function EditFields({ row, stage, editState, setField, getField, apiData, catego
             onChange={(e) => setField(ri, "City", e.target.value)} />
         </FieldWrap>
         <FieldWrap label="Repair Type">
-          <input style={s.input} value={getField(row, "Repair Type")}
-            onChange={(e) => setField(ri, "Repair Type", e.target.value)} />
+          <Select size="small" variant="outlined" value={getField(row, "Repair Type")}
+            onChange={(e) => setField(ri, "Repair Type", e.target.value)} sx={muiSx}>
+            {Object.keys(categoriesAndSubcategories || {}).map((n, i) => <MenuItem key={i} value={n}>{n}</MenuItem>)}
+          </Select>
         </FieldWrap>
         <FieldWrap label="Description" fullWidth>
           <textarea style={{ ...s.input, height: 56, resize: "vertical" }}
