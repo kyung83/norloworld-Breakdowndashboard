@@ -248,6 +248,17 @@ export default function KanbanBoard() {
     setExpandedId(null);
   };
 
+// "N/A - Not Needed" — auto-complete with Total="N/A", removes card
+  const handleNotNeeded = (row) => {
+    saveRow(row, {
+      "Repair Needed": "N/A - Not Needed",
+      Total: "N/A",
+      Status: "Complete"
+    });
+    setFilteredData((prev) => prev.filter((r) => r.rowIndex !== row.rowIndex));
+    setExpandedId(null);
+  };
+
   // Stage 3 mark complete — validates Total before removing card
   const handleMarkComplete = (row) => {
     const missing = validateStage3(row, editState[row.rowIndex]);
@@ -324,6 +335,7 @@ export default function KanbanBoard() {
                     onStage1Save={() => handleStage1Save(row)}
                     onStage2Advance={() => handleStage2ManualAdvance(row)}
                     onComplete={() => handleMarkComplete(row)}
+                    onNotNeeded={() => handleNotNeeded(row)}
                     saving={saving}
                     errors={validationErrors[row.rowIndex] || []}
                   />
@@ -346,7 +358,7 @@ function BreakdownCard({
   row, stage, expanded, onToggle,
   editState, setField, getField, apiData,
   categoriesAndSubcategories, onSave, onStage1Save,
-  onStage2Advance, onComplete, saving, errors,
+  onStage2Advance, onComplete, onNotNeeded, saving, errors,
 }) {
   const pri      = getPriority(row["BreakDown Date"]);
   const priStyle = PRI[pri];
@@ -400,10 +412,11 @@ const hoursAgo = dayjs().diff(dayjs(row["BreakDown Date"]), "hour");
               Required to advance: {errors.join(", ")}
             </div>
           )}
-          <EditFields
+        <EditFields
             row={row} stage={stage}
             editState={editState} setField={setField} getField={getField}
             apiData={apiData} categoriesAndSubcategories={categoriesAndSubcategories}
+            onNotNeeded={onNotNeeded}
           />
           <div style={s.detActions}>
             {/* Stage 1 — Save advances the card if all required fields are filled */}
@@ -439,7 +452,7 @@ const hoursAgo = dayjs().diff(dayjs(row["BreakDown Date"]), "hour");
 // =============================================================================
 // EditFields — fields shown per stage
 // =============================================================================
-function EditFields({ row, stage, editState, setField, getField, apiData, categoriesAndSubcategories }) {
+function EditFields({ row, stage, editState, setField, getField, apiData, categoriesAndSubcategories, onNotNeeded }) {
   const ri = row.rowIndex;
 
   // ── Stage 1: Roadside Requested & Diagnostics ─────────────────────────────
@@ -506,8 +519,15 @@ function EditFields({ row, stage, editState, setField, getField, apiData, catego
         <FieldWrap label="Repair Needed *" fullWidth>
           <Select size="small" variant="outlined"
             value={getField(row, "Repair Needed")}
-            onChange={(e) => setField(ri, "Repair Needed", e.target.value)}
+            onChange={(e) => {
+              if (e.target.value === "N/A - Not Needed") {
+                onNotNeeded();
+                return;
+              }
+              setField(ri, "Repair Needed", e.target.value);
+            }}
             sx={{ ...muiSx, minWidth: "100%" }}>
+            <MenuItem value="N/A - Not Needed" style={{ color: "#f87171", fontStyle: "italic" }}>N/A - Not Needed</MenuItem>
             {(categoriesAndSubcategories[getField(row, "Repair Type")] || []).map((sub, i) => (
               <MenuItem key={i} value={sub}>{sub}</MenuItem>
             ))}
