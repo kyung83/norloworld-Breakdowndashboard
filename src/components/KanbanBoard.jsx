@@ -148,8 +148,12 @@ const ETA_OPTIONS = [
 // =============================================================================
 export default function KanbanBoard() {
   const [{ data, loading, error }] = useAxios(END_POINT + "?route=getBreakdowns");
-  const [, executePost] = useAxios(
+const [, executePost] = useAxios(
     { url: END_POINT + "?route=editBreakdowns", method: "POST" },
+    { manual: true }
+  );
+  const [, executeNotNeeded] = useAxios(
+    { url: END_POINT + "?route=markNotNeeded", method: "POST" },
     { manual: true }
   );
 
@@ -248,15 +252,17 @@ export default function KanbanBoard() {
     setExpandedId(null);
   };
 
-// "N/A - Not Needed" — auto-complete with Total="N/A", removes card
-  const handleNotNeeded = (row) => {
-    saveRow(row, {
-      "Repair Needed": "N/A - Not Needed",
-      Total: "N/A",
-      Status: "Complete"
-    });
-    setFilteredData((prev) => prev.filter((r) => r.rowIndex !== row.rowIndex));
-    setExpandedId(null);
+// "N/A - Not Needed" — dedicated backend route, writes L/T/U/AC only, removes card
+  const handleNotNeeded = async (row) => {
+    setSaving(true);
+    try {
+      await executeNotNeeded({ data: JSON.stringify({ rowIndex: row.rowIndex }) });
+      setFilteredData((prev) => prev.filter((r) => r.rowIndex !== row.rowIndex));
+      setExpandedId(null);
+    } catch (err) {
+      console.error("markNotNeeded error:", err);
+    }
+    setSaving(false);
   };
 
   // Stage 3 mark complete — validates Total before removing card
