@@ -252,17 +252,12 @@ const [, executePost] = useAxios(
     setExpandedId(null);
   };
 
-// "N/A - Not Needed" — dedicated backend route, writes L/T/U/AC only, removes card
-  const handleNotNeeded = async (row) => {
-    setSaving(true);
-    try {
-      await executeNotNeeded({ data: JSON.stringify({ rowIndex: row.rowIndex }) });
-      setFilteredData((prev) => prev.filter((r) => r.rowIndex !== row.rowIndex));
-      setExpandedId(null);
-    } catch (err) {
-      console.error("markNotNeeded error:", err);
-    }
-    setSaving(false);
+  // "N/A - Not Needed" — writes Col L only via proven editBreakdowns path;
+  // the 5-min applyNotNeededCleanup trigger then stamps T/U/AC and closes the row.
+  const handleNotNeeded = (row) => {
+    saveRow(row, { "Repair Needed": "N/A - Not Needed" });
+    setFilteredData((prev) => prev.filter((r) => r.rowIndex !== row.rowIndex));
+    setExpandedId(null);
   };
 
   // Stage 3 mark complete — validates Total before removing card
